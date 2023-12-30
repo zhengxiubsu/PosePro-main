@@ -21,6 +21,100 @@ public class PlankService {
     @Autowired
     private VideoRepository videoRepository;
 
+
+    private long startTime = 0;
+    private long totalDuration = 0;
+
+
+
+    // Analyzes a single frame to determine the duration of the plank exercise.
+// It uses the system's current time to calculate the duration.
+    public int analyzePlankFrame(Image image) {
+        if (isMaintainingPlankPosture(image)) {
+            if (startTime == 0) {
+                // Set the start time if not previously set
+                startTime = System.currentTimeMillis();
+            }
+            // Update the total duration
+            totalDuration = System.currentTimeMillis() - startTime;
+        } else {
+            if (startTime != 0) {
+                // Stop timing and reset start time if the plank posture is not maintained
+                startTime = 0;
+            }
+        }
+        return (int) (totalDuration / 1000); // Return the duration in seconds
+    }
+
+
+
+
+
+
+    // Determines if the user is maintaining a plank posture in a given image.
+    private boolean isMaintainingPlankPosture(Image image) {
+        Coordinate leftShoulder = getCoordinateByName(image, "Left Shoulder");
+        Coordinate rightShoulder = getCoordinateByName(image, "Right Shoulder");
+        Coordinate leftHip = getCoordinateByName(image, "Left Hip");
+        Coordinate rightHip = getCoordinateByName(image, "Right Hip");
+        Coordinate leftAnkle = getCoordinateByName(image, "Left Ankle");
+        Coordinate rightAnkle = getCoordinateByName(image, "Right Ankle");
+
+        if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null || leftAnkle == null || rightAnkle == null) {
+            return false; // Essential coordinates are missing
+        }
+
+        // Calculate the angle between the shoulders and ankles
+        double angle = calculateAngle(leftShoulder, rightHip, rightAnkle);
+
+        // Define tolerance for maintaining plank posture
+        return angle >= 170 && angle <= 180;
+    }
+
+
+
+
+
+    // Calculates the angle formed by three coordinates.
+    private double calculateAngle(Coordinate a, Coordinate b, Coordinate c) {
+        // Create vectors AB and BC
+        double abX = b.getX() - a.getX();
+        double abY = b.getY() - a.getY();
+        double bcX = c.getX() - b.getX();
+        double bcY = c.getY() - b.getY();
+
+        // Calculate dot product
+        double dotProduct = abX * bcX + abY * bcY;
+
+        // Calculate lengths of vectors
+        double magnitudeAB = Math.sqrt(abX * abX + abY * abY);
+        double magnitudeBC = Math.sqrt(bcX * bcX + bcY * bcY);
+
+        // Calculate the angle
+        double angle = Math.acos(dotProduct / (magnitudeAB * magnitudeBC));
+        return Math.toDegrees(angle); // Convert radians to degrees
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     /**
      * Analyzes plank exercises from a video and saves the analysis to the associated user.
      *
@@ -118,4 +212,6 @@ public class PlankService {
         }
         return averagePostureScore;
     }
+
+
 }

@@ -24,6 +24,10 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
 
 @Service
 public class VideoService {
@@ -55,106 +59,74 @@ public class VideoService {
     @Autowired
     private CoordinateRepository coordinateRepository;
 
+    // Class attribute to store Image objects
+    private List<Image> images = new ArrayList<>();
 
-    // Method to process video
-    public String processVideo(byte[] videoBytes, int userId, String label) {
-        // Find user by userId
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) {
-            // Handle user not found
-            return "Invalid user";
+
+
+    // Counters for each type of exercise
+    private static int pushUpCount = 0;
+    private static int plankCount = 0;
+    private static int sitUpCount = 0;
+    private static int gluteBridgeCount = 0;
+    private static int flutterKickCount = 0;
+
+    // Method to process an image for a given exercise type and user
+    public int processImage(Image image, String exerciseType, int userId) {
+        if (image == null) {
+            System.out.println("No image provided, skipping frame.");
+            return 0; // Or return an error code indicating no processing was done.
         }
+        int count = 0;
 
-        System.out.println("valid user processing");
-
-        // Create and save the video object
-        Video video = new Video();
-        video.setUser(user);
-        video.setLabel(label); // Set the label for the video
-        videoRepository.save(video);
-        video.setImages(new ArrayList<>());
-
-        System.out.println("video object created");
-
-        // Split the video into key frames (every 3 frames)
-        List<byte[]> keyFrames = extractKeyFrames(videoBytes);
-        System.out.println("frames extracted");
-
-        // Process each frame
-        for (byte[] frame : keyFrames) {
-            Image image = new Image();
-
-            List<Coordinate> coordinates = getCoordinatesFromFrame(frame);
-
-            image.setCoordinates(coordinates);
-            imageRepository.save(image);
-            video.getImages().add(image); // Add image to video
-        }
-
-        System.out.println("frames processed");
-
-        // Analyze the video based on the label
-        switch (label) {
-            case "push_up":
-                pushUpService.analyzePushups(video.getId(), userId);
+        switch (exerciseType) {
+            case "pushup":
+                count = pushUpService.analyzePushupFrame(image, userId);
                 break;
             case "plank":
-                plankService.analyzePlank(video.getId(), userId);
+                count = plankService.analyzePlankFrame(image);
+                plankCount += count; // increment plank count
                 break;
-            case "sit_up":
-                sitUpService.analyzeSitUps(video.getId(), userId);
+            case "situp":
+                count = sitUpService.analyzeSitUpFrame(image);
+                sitUpCount += count; // increment sit-up count
                 break;
-            case "glute_bridge":
-                gluteBridgeService.analyzeGluteBridges(video.getId(), userId);
+            case "glutebridge":
+                count = gluteBridgeService.analyzeGluteBridgeFrame(image);
+                gluteBridgeCount += count; // increment glute bridge count
                 break;
-            case "flutter_kick":
-                flutterKicksService.analyzeFlutterKicks(video.getId(), userId);
+            case "flutterkick":
+                count = flutterKicksService.analyzeFlutterKickFrame(image);
+                flutterKickCount += count; // increment flutter kick count
                 break;
+            default:
+                System.out.println("Unsupported exercise type: " + exerciseType);
+                count = -9999; // indicate unsupported exercise type
         }
-
-        // Save the updated video object to the database
-        videoRepository.save(video);
-
-        return "Video processed successfully";
+        return count;
     }
 
-    private List<byte[]> extractKeyFrames(byte[] videoBytes) {
-        List<byte[]> keyFrames = new ArrayList<>();
-        Java2DFrameConverter converter = new Java2DFrameConverter();
 
-        try (FFmpegFrameGrabber frameGrabber = new FFmpegFrameGrabber(new ByteArrayInputStream(videoBytes))) {
-            frameGrabber.start();
 
-            int totalFrames = frameGrabber.getLengthInFrames();
-            System.out.println("Total frames in video: " + totalFrames);
 
-            if (totalFrames < 0) {
-                System.err.println("Invalid total frame count.");
-                return keyFrames; // or handle this case differently
-            }
 
-            for (int frameCount = 0; frameCount < totalFrames; frameCount++) {
-                org.bytedeco.javacv.Frame frame = frameGrabber.grabImage();
-                if (frame == null) {
-                    continue;
-                }
 
-                // Extract a key frame every 3 frames
-                if (frameCount % 100 == 0) {
-                    BufferedImage bufferedImage = converter.convert(frame);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    ImageIO.write(bufferedImage, "jpg", baos);
-                    keyFrames.add(baos.toByteArray());
-                    System.out.println("Key frame extracted: " + frameCount);
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+
+
+    public Image processSingleFrame(byte[] frameData) {
+        List<Coordinate> coordinates = getCoordinatesFromFrame(frameData);
+        if (coordinates.isEmpty()) {
+            System.out.println("No pose detected, skipping frame.");
+            return null;
         }
-
-        System.out.println("Extraction complete. Total key frames extracted: " + keyFrames.size());
-        return keyFrames;
+        Image image = new Image();
+        image.setCoordinates(coordinates);
+        imageRepository.save(image);
+        return image;
     }
+
+
+
 
     private List<Coordinate> getCoordinatesFromFrame(byte[] frame) {
         RestTemplate restTemplate = new RestTemplate();
@@ -212,4 +184,152 @@ public class VideoService {
             return new ArrayList<>();
         }
     }
+
+
+    public List<Image> processCoordinates() {
+        List<Coordinate> allCoordinates = coordinateRepository.findAll(); // Assume this retrieves all coordinates
+
+
+        List<Coordinate> tempCoordinates = new ArrayList<>();
+
+        for (int i = 0; i < allCoordinates.size(); i++) {
+            tempCoordinates.add(allCoordinates.get(i));
+
+            // Every 33 coordinates, create a new Image object and save it
+            if ((i + 1) % 33 == 0) {
+                Image image = new Image();
+                image.setCoordinates(new ArrayList<>(tempCoordinates));
+                imageRepository.save(image);
+
+                images.add(image);
+                tempCoordinates.clear(); // Clear the temporary list for the next image
+            }
+        }
+
+        // Handle remaining coordinates (if any)
+        if (!tempCoordinates.isEmpty()) {
+            Image image = new Image();
+            image.setCoordinates(tempCoordinates);
+            imageRepository.save(image);
+            images.add(image);
+        }
+        return images;
+
+        // You may choose to return the list of images or perform other operations
+    }
+
+
+
+
+    // Methods to get the current count for each exercise
+    public int getPushUpCount() {
+        return pushUpCount;
+    }
+
+    public int getPlankCount() {
+        return plankCount;
+    }
+
+    public int getSitUpCount() {
+        return sitUpCount;
+    }
+
+    public int getGluteBridgeCount() {
+        return gluteBridgeCount;
+    }
+
+    public int getFlutterKickCount() {
+        return flutterKickCount;
+    }
+
+    /**
+     * ***********************
+     * 以下是无用代码。
+     * ***********************
+     */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // Method to process video
+    public String processVideo(byte[] videoBytes, int userId, String label) {
+        // Find user by userId
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return "Invalid user";
+        }
+
+        // Extract key frames from the video bytes
+        List<byte[]> keyFrames = extractKeyFrames(videoBytes);
+
+        // Process each frame to create an Image object and analyze it
+        for (byte[] frame : keyFrames) {
+            List<Coordinate> coordinates = getCoordinatesFromFrame(frame);
+            if (!coordinates.isEmpty()) {
+                Image image = new Image();
+                image.setCoordinates(coordinates);
+                imageRepository.save(image);
+
+                // Process the image for the given exercise type
+                int result = processImage(image, label, userId);
+                // You can now use the result as needed, e.g., accumulate it or store it
+            }
+        }
+
+        return "Video processed successfully";
+    }
+
+    private List<byte[]> extractKeyFrames(byte[] videoBytes) {
+        List<byte[]> keyFrames = new ArrayList<>();
+        Java2DFrameConverter converter = new Java2DFrameConverter();
+
+        try (FFmpegFrameGrabber frameGrabber = new FFmpegFrameGrabber(new ByteArrayInputStream(videoBytes))) {
+            frameGrabber.start();
+
+            int totalFrames = frameGrabber.getLengthInFrames();
+            System.out.println("Total frames in video: " + totalFrames);
+
+            if (totalFrames < 0) {
+                System.err.println("Invalid total frame count.");
+                return keyFrames; // or handle this case differently
+            }
+
+            for (int frameCount = 0; frameCount < totalFrames; frameCount++) {
+                org.bytedeco.javacv.Frame frame = frameGrabber.grabImage();
+                if (frame == null) {
+                    continue;
+                }
+
+                // Extract a key frame every 3 frames
+                if (frameCount % 100 == 0) {
+                    BufferedImage bufferedImage = converter.convert(frame);
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    ImageIO.write(bufferedImage, "jpg", baos);
+                    keyFrames.add(baos.toByteArray());
+                    System.out.println("Key frame extracted: " + frameCount);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Extraction complete. Total key frames extracted: " + keyFrames.size());
+        return keyFrames;
+    }
+
+
 }

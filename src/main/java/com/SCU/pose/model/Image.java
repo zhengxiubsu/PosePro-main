@@ -56,4 +56,5 @@ public class Image {
 
         return totalY / coordinates.size();
     }
+
 }

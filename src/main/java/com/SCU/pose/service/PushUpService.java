@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.Optional;
 
 @Service
 public class PushUpService {
@@ -20,6 +21,94 @@ public class PushUpService {
 
     @Autowired
     private VideoRepository videoRepository;
+
+    private boolean isDown = false; // Track the pushup position across frames
+
+
+    public int analyzePushupFrame(Image image, int userId) {
+        if (isPushupDown(image)) {
+            if (!isDown) {
+                isDown = true; // Mark as down
+                return 0; // No count increment as it's the downward movement
+            }
+        } else {
+            if (isDown) {
+                isDown = false; // Reset for next pushup
+                return updatePushUpCount(userId);
+                // Increment count as user moved from down to up
+            }
+        }
+        return 0; // Default return value when no pushup count increment
+    }
+
+
+    private boolean isPushupDown(Image image) {
+        Coordinate rightElbow = getCoordinateByName(image, "Right Elbow");
+        Coordinate rightShoulder = getCoordinateByName(image, "Right Shoulder");
+        Coordinate leftElbow = getCoordinateByName(image, "Left Elbow");
+        Coordinate leftShoulder = getCoordinateByName(image, "Left Shoulder");
+
+
+        if (rightElbow == null || rightShoulder == null || leftElbow == null || leftShoulder == null) {
+            return false;
+        }
+
+        boolean rightElbowDown = rightElbow.getY() > rightShoulder.getY();
+        boolean leftElbowDown = leftElbow.getY() > leftShoulder.getY();
+
+        return rightElbowDown && leftElbowDown;
+    }
+
+
+
+
+// 在 PushUpService 中
+
+    public int updatePushUpCount(int userId) {
+
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        // Fetch the latest PushUp record for the given user
+        Optional<PushUp> latestPushUpOpt = pushUpRepository.findTopByUserIdOrderByExerciseDateDesc(userId);
+
+        // Use the latest record if it exists, otherwise create a new PushUp object
+        PushUp latestPushUp = latestPushUpOpt.orElse(new PushUp(user, 0, 0.0, new Date(), "Standard Pushup", ""));
+
+        // Increment the count of the latest or new PushUp record
+        latestPushUp.setCount(latestPushUp.getCount() + 1);
+
+        // Save the updated or new PushUp record to the database
+        pushUpRepository.save(latestPushUp);
+        return latestPushUp.getCount();
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public void analyzePushups(int videoId, int userId) {
         Video video = videoRepository.findById(videoId).orElse(null);
@@ -57,16 +146,7 @@ public class PushUpService {
         return pushupCount;
     }
 
-    private boolean isPushupDown(Image image) {
-        Coordinate rightElbow = getCoordinateByName(image, "Right Elbow");
-        Coordinate rightShoulder = getCoordinateByName(image, "Right Shoulder");
 
-        if (rightElbow == null || rightShoulder == null) {
-            return false;
-        }
-
-        return rightElbow.getY() > rightShoulder.getY();
-    }
 
     private double calculateAverageScore(Video video, int pushupCount) {
         double totalScore = 0.0;
@@ -154,4 +234,6 @@ public class PushUpService {
 
         return comment.toString();
     }
+
 }
+

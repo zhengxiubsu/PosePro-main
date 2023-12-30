@@ -21,6 +21,86 @@ public class SitUpService {
     @Autowired
     private VideoRepository videoRepository;
 
+
+
+
+
+
+    private boolean isUpPreviously = false;  // This flag tracks if the user was in the "up" position in the previous frame
+
+    /**
+     * Analyzes a single frame to determine if it represents a sit-up movement.
+     *
+     * @param image The image object representing a single frame of the video.
+     * @return Returns 1 if a sit-up is detected, otherwise returns 0.
+     */
+    public int analyzeSitUpFrame(Image image) {
+        boolean isCurrentlyUp = isSitUpUp(image);  // Check if the user is in the "up" position in the current frame
+
+        if (isCurrentlyUp && !isUpPreviously) {
+            // If the user is currently "up" and was not "up" in the previous frame, it's counted as one complete sit-up
+            isUpPreviously = true;  // Update the flag as the user is now "up"
+            return 1;  // Count this frame as one sit-up
+        } else if (!isCurrentlyUp && isUpPreviously) {
+            // If the user was "up" previously but not in the current frame, reset the flag
+            isUpPreviously = false;  // Reset the flag as the user is no longer "up"
+        }
+
+        return 0;  // No new sit-up detected in this frame
+    }
+
+    /**
+     * Determines if the user is in the "up" position of a sit-up.
+     *
+     * @param image The image object to analyze.
+     * @return Returns true if the user is in the "up" position, otherwise false.
+     */
+    private boolean isSitUpUp(Image image) {
+        Coordinate head = getCoordinateByName(image, "Nose"); // Assuming nose as a reference for head position
+        Coordinate hips = getCoordinateByName(image, "MidHip"); // Assuming mid-hip as a reference for hip position
+
+        if (head == null || hips == null) {
+            return false;  // Return false if essential coordinates are missing
+        }
+
+        return head.getY() < hips.getY(); // In a sit-up, the head should be above the hips for the "up" position
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     public void analyzeSitUps(int videoId, int userId) {
         Video video = videoRepository.findById(videoId).orElse(null);
         if (video == null) {
@@ -57,16 +137,7 @@ public class SitUpService {
         return sitUpCount;
     }
 
-    private boolean isSitUpUp(Image image) {
-        Coordinate head = getCoordinateByName(image, "Nose"); // Assuming nose as a reference for head position
-        Coordinate hips = getCoordinateByName(image, "MidHip"); // Assuming mid-hip as a reference for hip position
 
-        if (head == null || hips == null) {
-            return false;
-        }
-
-        return head.getY() < hips.getY(); // In a sit-up, the head comes above the hips
-    }
 
     private double calculateAverageScore(Video video) {
         double totalScore = 0.0;
@@ -113,4 +184,8 @@ public class SitUpService {
 
         return comment.toString();
     }
+
+
+
+
 }

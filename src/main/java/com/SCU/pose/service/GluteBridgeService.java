@@ -21,6 +21,83 @@ public class GluteBridgeService {
     @Autowired
     private VideoRepository videoRepository;
 
+
+
+
+
+    private boolean isUpPreviously = false;  // Flag to track if the user was in the "up" position in the previous frame
+
+    /**
+     * Analyzes a single frame to determine if it represents a glute bridge movement.
+     *
+     * @param image The image object representing a single frame of the video.
+     * @return Returns 1 if a glute bridge movement is detected, otherwise returns 0.
+     */
+    public int analyzeGluteBridgeFrame(Image image) {
+        boolean isCurrentlyUp = isGluteBridgeUp(image);  // Check if the user is in the "up" position in the current frame
+
+        if (isCurrentlyUp && !isUpPreviously) {
+            // If the user is currently "up" and was not "up" in the previous frame, count as one glute bridge
+            isUpPreviously = true;  // Update the flag as the user is now "up"
+            return 1;  // Count this frame as one glute bridge
+        } else if (!isCurrentlyUp && isUpPreviously) {
+            // If the user was "up" previously but not in the current frame, reset the flag
+            isUpPreviously = false;  // Reset the flag as the user is no longer "up"
+        }
+
+        return 0;  // No new glute bridge detected in this frame
+    }
+
+    /**
+     * Determines if the user is in the "up" position of a glute bridge.
+     *
+     * @param image The image object to analyze.
+     * @return Returns true if the user is in the "up" position, otherwise false.
+     */
+    private boolean isGluteBridgeUp(Image image) {
+        // Placeholder logic for detecting the "up" position of a glute bridge
+        // This should be replaced with actual logic based on your coordinate data
+        Coordinate hip = getCoordinateByName(image, "Hip");
+        Coordinate knee = getCoordinateByName(image, "Knee");
+
+        if (hip == null || knee == null) {
+            return false;  // Return false if essential coordinates are missing
+        }
+
+        // Example condition: Hip is higher than knee in the "up" position
+        return hip.getY() < knee.getY();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     public void analyzeGluteBridges(int videoId, int userId) {
         Video video = videoRepository.findById(videoId).orElse(null);
         if (video == null) {
@@ -57,19 +134,7 @@ public class GluteBridgeService {
         return count;
     }
 
-    private boolean isGluteBridgeUp(Image image) {
-        // Placeholder logic for detecting the "up" position of a glute bridge
-        // This should be replaced with actual logic based on your coordinate data
-        Coordinate hip = getCoordinateByName(image, "Hip");
-        Coordinate knee = getCoordinateByName(image, "Knee");
 
-        if (hip == null || knee == null) {
-            return false;
-        }
-
-        // Example condition: Hip is higher than knee in the "up" position
-        return hip.getY() < knee.getY();
-    }
 
     private double calculateAverageScore(Video video, int repetitions) {
         double totalScore = 0.0;
@@ -122,4 +187,5 @@ public class GluteBridgeService {
 
         return comment.toString();
     }
+
 }
