@@ -1,6 +1,7 @@
 package com.SCU.pose.model;
 
 import javax.persistence.*;
+import java.util.*;
 import java.util.List;
 
 @Entity
@@ -15,11 +16,20 @@ public class Video {
     @JoinColumn(name = "user_id") // Foreign key in Video table
     private User user; // Reference back to the User entity
 
+    @Column(name = "label")
     private String label;
 
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "video_id") // Foreign key in Image table
     private List<Image> images;
+
+    @OneToMany(mappedBy = "video", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PushUp> pushUps;
+
+
+
+
+
 
     // Constructors
     public Video() {
@@ -61,6 +71,14 @@ public class Video {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public List<PushUp> getPushUps() {
+        return pushUps;
+    }
+
+    public void setPushUps(List<PushUp> pushUps) {
+        this.pushUps = pushUps;
     }
 
 }

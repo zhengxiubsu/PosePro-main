@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Optional;
 
 @Service
 public class VideoService {
@@ -64,41 +65,91 @@ public class VideoService {
 
 
 
-    // Counters for each type of exercise
-    private static int pushUpCount = 0;
-    private static int plankCount = 0;
-    private static int sitUpCount = 0;
-    private static int gluteBridgeCount = 0;
-    private static int flutterKickCount = 0;
+
+
+    //**********************************12.31**********************************
+    public Video createAndSaveVideo(int userId, String exerciseType) {
+        Video video = new Video();
+        video.setLabel(exerciseType);
+
+        // Find the user by userId and set it in the Video object
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        video.setUser(user);
+
+        // Initialize an empty list of images for the video
+        video.setImages(new ArrayList<>());
+
+        videoRepository.save(video);
+        return video;
+    }
+
+
+
+    //**********************************12.31**********************************
+    /**
+     * Adds a processed frame (Image object) to a specific Video entity.
+     *
+     * @param videoId The ID of the Video to which the frame will be added.
+     * @param image The Image object representing the processed frame.
+     */
+    public void addFrameToVideo(int videoId, Image image) {
+        // Fetch the Video entity based on the provided videoId.
+        Optional<Video> videoOptional = videoRepository.findById(videoId);
+        if (videoOptional.isPresent()) {
+            Video video = videoOptional.get();
+
+            // Retrieve the current list of images (frames) associated with the video.
+            List<Image> images = video.getImages();
+            if (images == null) {
+                // Initialize the list if it's null.
+                images = new ArrayList<>();
+                video.setImages(images);
+            }
+            // Add the new image to the list.
+            images.add(image);
+
+            // Save the updated Video entity back to the database.
+            videoRepository.save(video);
+        } else {
+            // Handle the case where no corresponding Video entity is found.
+            throw new RuntimeException("Video not found with ID: " + videoId);
+        }
+    }
+
+
+
+
+
+
 
     // Method to process an image for a given exercise type and user
-    public int processImage(Image image, String exerciseType, int userId) {
+    public int processImage(Image image, String exerciseType, int userId, int videoId) {
         if (image == null) {
-            System.out.println("No image provided, skipping frame.");
-            return 0; // Or return an error code indicating no processing was done.
-        }
-        int count = 0;
+            System.out.println("No image provided, returning current count.");
 
+            return getCurrentCountForExerciseType(exerciseType, userId, videoId);
+        }
+        int count=0;
         switch (exerciseType) {
             case "pushup":
-                count = pushUpService.analyzePushupFrame(image, userId);
+                count = pushUpService.analyzePushupFrame(image, userId, videoId);
                 break;
-            case "plank":
-                count = plankService.analyzePlankFrame(image);
-                plankCount += count; // increment plank count
-                break;
-            case "situp":
-                count = sitUpService.analyzeSitUpFrame(image);
-                sitUpCount += count; // increment sit-up count
-                break;
-            case "glutebridge":
-                count = gluteBridgeService.analyzeGluteBridgeFrame(image);
-                gluteBridgeCount += count; // increment glute bridge count
-                break;
-            case "flutterkick":
-                count = flutterKicksService.analyzeFlutterKickFrame(image);
-                flutterKickCount += count; // increment flutter kick count
-                break;
+//            case "plank":
+//                count = plankService.analyzePlankFrame(image, userId, videoId);
+//                // increment plank count
+//                break;
+//            case "situp":
+//                count = sitUpService.analyzeSitUpFrame(image, userId, videoId);
+//                 // increment sit-up count
+//                break;
+//            case "glutebridge":
+//                count = gluteBridgeService.analyzeGluteBridgeFrame(image, userId, videoId);
+//                 // increment glute bridge count
+//                break;
+//            case "flutterkick":
+//                count = flutterKicksService.analyzeFlutterKickFrame(image, userId, videoId);
+//                 // increment flutter kick count
+//                break;
             default:
                 System.out.println("Unsupported exercise type: " + exerciseType);
                 count = -9999; // indicate unsupported exercise type
@@ -106,6 +157,18 @@ public class VideoService {
         return count;
     }
 
+
+
+    private int getCurrentCountForExerciseType(String exerciseType, int userId, int videoId) {
+        switch (exerciseType) {
+            case "pushup":
+                // 获取 pushup 的当前计数
+                return pushUpService.getCurrentPushUpCount( videoId);
+            // .
+            default:
+                return 0; //
+        }
+    }
 
 
 
@@ -221,27 +284,6 @@ public class VideoService {
 
 
 
-    // Methods to get the current count for each exercise
-    public int getPushUpCount() {
-        return pushUpCount;
-    }
-
-    public int getPlankCount() {
-        return plankCount;
-    }
-
-    public int getSitUpCount() {
-        return sitUpCount;
-    }
-
-    public int getGluteBridgeCount() {
-        return gluteBridgeCount;
-    }
-
-    public int getFlutterKickCount() {
-        return flutterKickCount;
-    }
-
     /**
      * ***********************
      * 以下是无用代码。
@@ -265,33 +307,7 @@ public class VideoService {
 
 
 
-    // Method to process video
-    public String processVideo(byte[] videoBytes, int userId, String label) {
-        // Find user by userId
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) {
-            return "Invalid user";
-        }
 
-        // Extract key frames from the video bytes
-        List<byte[]> keyFrames = extractKeyFrames(videoBytes);
-
-        // Process each frame to create an Image object and analyze it
-        for (byte[] frame : keyFrames) {
-            List<Coordinate> coordinates = getCoordinatesFromFrame(frame);
-            if (!coordinates.isEmpty()) {
-                Image image = new Image();
-                image.setCoordinates(coordinates);
-                imageRepository.save(image);
-
-                // Process the image for the given exercise type
-                int result = processImage(image, label, userId);
-                // You can now use the result as needed, e.g., accumulate it or store it
-            }
-        }
-
-        return "Video processed successfully";
-    }
 
     private List<byte[]> extractKeyFrames(byte[] videoBytes) {
         List<byte[]> keyFrames = new ArrayList<>();

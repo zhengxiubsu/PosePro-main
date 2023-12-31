@@ -14,7 +14,7 @@ public interface PushUpRepository extends JpaRepository<PushUp, Integer> {
 
     // Find the most recent PushUp record for a given user, ordered by the exercise date in descending order
     // Returns an Optional, which can be empty if no record is found
-    Optional<PushUp> findTopByUserIdOrderByExerciseDateDesc(int userId);
+    List<PushUp> findByUserIdOrderByExerciseDateAscVideoIdAsc(int userId);
 
-    // Additional custom methods can be defined here if needed
+    Optional<PushUp> findTopByVideoIdOrderByExerciseDateDesc(int videoId);
 }

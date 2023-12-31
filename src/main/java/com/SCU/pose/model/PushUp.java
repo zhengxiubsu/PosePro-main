@@ -14,18 +14,27 @@ public class PushUp {
     private int id;
 
     @ManyToOne
+    @JoinColumn(name = "video_id")
+    private Video video;
+
+    @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "count")
     private int count;
 
+
+    @Column(name = "exercise_date")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date exerciseDate;
+
+
+
     @Column(name = "average_score")
     private double averageScore;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "exercise_date")
-    private Date exerciseDate;
+
 
     @Column(name = "label")
     private String label; // Label for the exercise, e.g., "Standard Pushup", "Wide Grip Pushup"
@@ -38,16 +47,25 @@ public class PushUp {
         // Default constructor
     }
 
-    public PushUp(User user, int count, double averageScore, Date exerciseDate, String label, String comment) {
+    public PushUp(User user, int count, double averageScore, Date exerciseDate, String label, String comment, Video video) {
         this.user = user;
         this.count = count;
         this.averageScore = averageScore;
         this.exerciseDate = exerciseDate;
         this.label = label;
         this.comment = comment;
+        this.video = video; //
     }
 
+
     // Getters and setters
+
+    public Video getVideo() {
+        return video;
+    }
+    public void setVideo(Video video) {
+        this.video = video;
+    }
     public int getId() {
         return id;
     }

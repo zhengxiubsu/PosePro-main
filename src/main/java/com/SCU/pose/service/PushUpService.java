@@ -7,8 +7,7 @@ import com.SCU.pose.repository.VideoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class PushUpService {
@@ -25,20 +24,51 @@ public class PushUpService {
     private boolean isDown = false; // Track the pushup position across frames
 
 
-    public int analyzePushupFrame(Image image, int userId) {
+
+    //**********************************12.31**********************************
+    public int analyzePushupFrame(Image image, int userId, int videoId) {
+        int currentCount = getCurrentPushUpCount(videoId);
         if (isPushupDown(image)) {
             if (!isDown) {
-                isDown = true; // Mark as down
-                return 0; // No count increment as it's the downward movement
+                isDown = true;
+                return currentCount;
             }
         } else {
             if (isDown) {
-                isDown = false; // Reset for next pushup
-                return updatePushUpCount(userId);
-                // Increment count as user moved from down to up
+                isDown = false;
+                return updatePushUpCount(userId, videoId);
             }
         }
-        return 0; // Default return value when no pushup count increment
+        return currentCount;
+    }
+
+
+
+
+    //**********************************12.31**********************************
+    public int updatePushUpCount(int userId, int videoId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new RuntimeException("Video not found"));
+
+        Optional<PushUp> latestPushUpOpt = pushUpRepository.findTopByVideoIdOrderByExerciseDateDesc(videoId);
+
+        PushUp latestPushUp = latestPushUpOpt
+                .orElse(new PushUp(user, 0, 0.0, new Date(), "Standard Pushup", "", video));
+
+        latestPushUp.setCount(latestPushUp.getCount() + 1);
+
+        pushUpRepository.save(latestPushUp);
+        return latestPushUp.getCount();
+    }
+
+
+    //**********************************12.31**********************************
+    public int getCurrentPushUpCount(int videoId) {
+
+        Optional<PushUp> latestPushUpOpt = pushUpRepository.findTopByVideoIdOrderByExerciseDateDesc(videoId);
+        return latestPushUpOpt.map(PushUp::getCount).orElse(0);
     }
 
 
@@ -62,24 +92,31 @@ public class PushUpService {
 
 
 
-// 在 PushUpService 中
 
-    public int updatePushUpCount(int userId) {
+    public List<Map<Date, Integer>> getOrderedPushUpsByUser(int userId) {
+        List<PushUp> pushUps = pushUpRepository.findByUserIdOrderByExerciseDateAscVideoIdAsc(userId);
 
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        // Fetch the latest PushUp record for the given user
-        Optional<PushUp> latestPushUpOpt = pushUpRepository.findTopByUserIdOrderByExerciseDateDesc(userId);
+        Map<Date, Map<Integer, Integer>> dateVideoCountMap = new LinkedHashMap<>();
+        for (PushUp pushUp : pushUps) {
+            Date date = pushUp.getExerciseDate();
+            Integer videoId = pushUp.getVideo().getId();
+            Integer count = pushUp.getCount();
 
-        // Use the latest record if it exists, otherwise create a new PushUp object
-        PushUp latestPushUp = latestPushUpOpt.orElse(new PushUp(user, 0, 0.0, new Date(), "Standard Pushup", ""));
+            dateVideoCountMap.computeIfAbsent(date, k -> new HashMap<>())
+                    .merge(videoId, count, Integer::sum);
+        }
 
-        // Increment the count of the latest or new PushUp record
-        latestPushUp.setCount(latestPushUp.getCount() + 1);
 
-        // Save the updated or new PushUp record to the database
-        pushUpRepository.save(latestPushUp);
-        return latestPushUp.getCount();
+        List<Map<Date, Integer>> resultList = new ArrayList<>();
+        dateVideoCountMap.forEach((date, videoCountMap) -> {
+            for (Map.Entry<Integer, Integer> entry : videoCountMap.entrySet()) {
+                Map<Date, Integer> map = new HashMap<>();
+                map.put(date, entry.getValue());
+                resultList.add(map);
+            }
+        });
 
+        return resultList;
     }
 
 
@@ -110,25 +147,7 @@ public class PushUpService {
 
 
 
-    public void analyzePushups(int videoId, int userId) {
-        Video video = videoRepository.findById(videoId).orElse(null);
-        if (video == null) {
-            return; // Video not found
-        }
 
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) {
-            return; // User not found
-        }
-
-        int pushupCount = countPushups(video);
-        double averageScore = calculateAverageScore(video, pushupCount);
-
-        String performanceComment = generatePerformanceComment(pushupCount, averageScore);
-
-        PushUp pushup = new PushUp(user, pushupCount, averageScore, new Date(), video.getLabel(), performanceComment);
-        pushUpRepository.save(pushup);
-    }
 
     private int countPushups(Video video) {
         int pushupCount = 0;
