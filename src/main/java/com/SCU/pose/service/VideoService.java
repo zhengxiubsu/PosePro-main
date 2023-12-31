@@ -162,7 +162,7 @@ public class VideoService {
     private int getCurrentCountForExerciseType(String exerciseType, int userId, int videoId) {
         switch (exerciseType) {
             case "pushup":
-                // 获取 pushup 的当前计数
+                //pushup
                 return pushUpService.getCurrentPushUpCount( videoId);
             // .
             default:
@@ -172,16 +172,12 @@ public class VideoService {
 
 
 
-
-
-
-
     public Image processSingleFrame(byte[] frameData) {
         List<Coordinate> coordinates = getCoordinatesFromFrame(frameData);
-        if (coordinates.isEmpty()) {
-            System.out.println("No pose detected, skipping frame.");
-            return null;
-        }
+//        if (coordinates.isEmpty()) {
+//            System.out.println("No pose detected, skipping frame.");
+//            return null;
+//        }
         Image image = new Image();
         image.setCoordinates(coordinates);
         imageRepository.save(image);
@@ -218,6 +214,11 @@ public class VideoService {
         // Parse the response to create Coordinate objects
         String responseBody = response.getBody();
         System.out.println("Response Body: " + responseBody);
+        assert responseBody != null;
+        if(responseBody.equals("No pose landmarks detected")){
+            return new ArrayList<>();
+        }
+
         return parseCoordinates(responseBody);
     }
 
@@ -281,33 +282,11 @@ public class VideoService {
         // You may choose to return the list of images or perform other operations
     }
 
-
-
-
     /**
      * ***********************
      * 以下是无用代码。
      * ***********************
      */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     private List<byte[]> extractKeyFrames(byte[] videoBytes) {
         List<byte[]> keyFrames = new ArrayList<>();
